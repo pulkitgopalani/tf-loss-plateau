@@ -1,0 +1,16 @@
+*.out
+*.tar
+*.png
+*.pdf
+*.pyc
+*.yaml
+*.txt
+*.sh
+*/wandb*
+*.gif
+*.json
+*loss_logs/
+*pythia_old/
+*pythia_sample_old/
+*pythia/
+# *.npy
