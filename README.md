@@ -6,6 +6,8 @@ Code for the paper "What Happens During the Loss Plateau? Understanding Abrupt L
 
 See `env.yml` for requirements; also add your W&B key to `train_*.py` files for tracking metrics. 
 
+Jupyter notebook `mws_notebook.ipynb` can be used for minimal implementation of main results for MWS task.
+
 In the `src/` directory, run the following for each figure in the paper:
 
 | **Experiment Description** | **Command / Steps** |
@@ -26,40 +28,3 @@ In the `src/` directory, run the following for each figure in the paper:
 | SGD training (Fig. 26) | `python train_mws_sgd.py --config configs/mws.yaml` |
 | Representation collapse at various model layers (Fig. 27-28) | `python train_mws_all_locs.py --config configs/mws.yaml` |
 | MWS: biasing attention map at different train steps (Fig. 29) | `python train_mws_att_scale.py --config configs/mws_att_scale_10_{25,50,75,100}.yaml` |
-
-
-<!-- : 
-```bash
-train_mws.py --config configs/mws.yaml
-```
-
-Fig. 3: 
-```bash
-train_mws_att_scale.py --config configs/mws_att_scale_{2_5,10}.yaml
-```
-
-Fig. 4: 
-```bash
-train_mws_att_scale.py --config configs/mws_att_scale_{0_2,0_5}.yaml
-```
-
-Fig. 5: 
-```bash
-train_mws_optimal_init.py --config configs/mws.yaml
-```
-
-Fig. 6: 
-```bash
-train_prefix.py --config configs/prefix.yaml
-```
-
-
-Fig. 7: 
-```bash
-train_repeat.py --config configs/repeat1.yaml
-```
-
-Fig. 8 
-```bash
-pythia.py
-``` -->
