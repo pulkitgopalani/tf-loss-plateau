@@ -1,0 +1,23 @@
+model:
+  n_layer: 1
+  n_head: 1
+  n_embd: 256
+  linear: True
+
+data:
+  name: 'reverse'
+  min_num: 1
+  max_num: 16
+  num_tokens: 16
+  n_train: 256
+  n_test: 64
+  fixed_len: True
+
+train:
+  lr: 0.0001
+  grad_clip: -1
+  num_steps: 100
+  norm_type: "none_rank"
+  wandb: True
+  save_ckpt: False
+  ckpt_freq: 20

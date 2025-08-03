@@ -1,0 +1,23 @@
+model:
+  n_layer: 2
+  n_head: 1
+  n_embd: 256
+  linear: True
+
+data:
+  name: 'hist'
+  num_tokens: 16
+  alphabet_size: 12
+  cot: False
+  n_train: 256
+  n_test: 64
+  fixed_len: True
+
+train:
+  lr: 0.0001 
+  grad_clip: 1.0
+  num_steps: 5000
+  norm_type: "none_rank"
+  wandb: True
+  save_ckpt: False
+  ckpt_freq: 20

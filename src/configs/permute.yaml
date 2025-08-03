@@ -1,0 +1,27 @@
+model:
+  n_layer: 2
+  n_head: 1
+  n_embd: 256
+  linear: True
+
+data:
+  name: 'permute'
+  min_num: 17
+  max_num: 32
+  num_tokens: 16
+  shift: 0
+  compose: 1
+  rotate: 0
+  cot: False
+  n_train: 256
+  n_test: 64
+  fixed_len: True
+
+train:
+  lr: 0.0001
+  grad_clip: -1
+  num_steps: 2000
+  norm_type: "none_rank"
+  wandb: True
+  save_ckpt: True
+  ckpt_freq: 100

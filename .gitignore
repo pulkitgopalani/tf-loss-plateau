@@ -3,7 +3,7 @@
 *.png
 *.pdf
 *.pyc
-*.yaml
+# *.yaml
 *.txt
 *.sh
 */wandb*
