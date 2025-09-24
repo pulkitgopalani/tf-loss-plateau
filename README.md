@@ -1,6 +1,6 @@
 # tf-loss-plateau
 
-Code for the paper "What Happens During the Loss Plateau? Understanding Abrupt Learning in Transformers" [arXiv: 2506.13688](https://arxiv.org/abs/2506.13688).
+Code for the paper "What Happens During the Loss Plateau? Understanding Abrupt Learning in Transformers" (NeurIPS 2025) [arXiv: 2506.13688](https://arxiv.org/abs/2506.13688).
 
 ## Setup
 
