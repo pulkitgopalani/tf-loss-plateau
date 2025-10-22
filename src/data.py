@@ -62,13 +62,23 @@ class MovingWindowSum:
         )
 
         return samples
-    
-class HardWindowSum:
-    def __init__(self, min_num=1, max_num=16, k=2, p=17, sep=17, device="cuda"):
+
+class ConcatMovingWindowSum:
+    def __init__(
+        self,
+        min_num=1,
+        max_num=16,
+        k=2,
+        p=17,
+        mix_type="123_disjoint_454",
+        sep=17,
+        device="cuda",
+    ):
         self.min_num = min_num
         self.max_num = max_num
         self.k = k
         self.p = p
+        self.mix_type = mix_type
         self.sep = sep
         self.device = device
         assert self.p > self.max_num
@@ -84,33 +94,106 @@ class HardWindowSum:
         ).to(self.device)
 
         random_ints_np = random_ints.detach().cpu().numpy()
-        convolution = torch.stack(
+        convolution2 = torch.stack(
             [
                 torch.from_numpy(
                     np.convolve(
                         random_ints_np[i],
-                        np.ones(self.k),
+                        np.ones(2),
                         mode="valid",
                     )
                 )
                 for i in range(random_ints.shape[0])
             ]
-        ).to(self.device)
+        )
 
-        # for i in range(num_samples):
-        #     for j in range(0, self.k - 1):
-        #         if moving_sum[i, j] != random_ints[i, j]:
-        #             print(f"ERROR! {i} {j}")
-        #     for j in range(self.k - 1, num_tokens):
-        #         if moving_sum[i, j] != torch.sum(random_ints[i, j-self.k+1:j+1]):
-        #             print(f"ERROR! {i} {j}")
+        if self.mix_type == "124_stair_653":
+            convolution4 = torch.stack(
+                [
+                    torch.from_numpy(
+                        np.convolve(
+                            random_ints_np[i],
+                            np.ones(4),
+                            mode="valid",
+                        )
+                    )
+                    for i in range(random_ints.shape[0])
+                ]
+            )
+
+            # Stair 124 - 653
+            moving_sum = random_ints[:, :14].clone().detach()
+            moving_sum[:, 6:11] = convolution2[:, :5]
+            moving_sum[:, 11:14] = convolution4[:, :3]
+
+        elif self.mix_type == "124_disjoint_444":
+            convolution4 = torch.stack(
+                [
+                    torch.from_numpy(
+                        np.convolve(
+                            random_ints_np[i],
+                            np.ones(4),
+                            mode="valid",
+                        )
+                    )
+                    for i in range(random_ints.shape[0])
+                ]
+            )
+
+            # Disjoint 124 - 444
+            moving_sum = random_ints[:, :12].clone().detach()
+            moving_sum[:, 4:8] = convolution2[:, 4:8]
+            moving_sum[:, 8:12] = convolution4[:, 9:]
+
+        elif self.mix_type == "124_disjoint_453":
+            convolution4 = torch.stack(
+                [
+                    torch.from_numpy(
+                        np.convolve(
+                            random_ints_np[i],
+                            np.ones(4),
+                            mode="valid",
+                        )
+                    )
+                    for i in range(random_ints.shape[0])
+                ]
+            )
+
+            # Disjoint 124 - 453
+            moving_sum = random_ints[:, :12].clone().detach()
+            moving_sum[:, 4:9] = convolution2[:, 4:9]
+            moving_sum[:, 9:12] = convolution4[:, 10:]
+
+        elif self.mix_type == "123_disjoint_454":
+            convolution3 = torch.stack(
+                [
+                    torch.from_numpy(
+                        np.convolve(
+                            random_ints_np[i],
+                            np.ones(3),
+                            mode="valid",
+                        )
+                    )
+                    for i in range(random_ints.shape[0])
+                ]
+            )
+
+            # Disjoint 123 - 454
+            # print(convolution3.shape)
+            # exit()
+            moving_sum = random_ints[:, :13].clone().detach()
+            moving_sum[:, 4:9] = convolution2[:, 4:9]
+            moving_sum[:, 9:13] = convolution3[:, 10:]
+
+        else:
+            raise ValueError("Data mixture type not defined")
 
         samples = (
             torch.cat(
                 [
                     random_ints,
                     self.sep * torch.ones(size=(num_samples, 1)).to(self.device),
-                    torch.remainder(input=convolution, other=self.p),
+                    torch.remainder(input=moving_sum, other=self.p),
                 ],
                 axis=-1,
             )
@@ -213,43 +296,6 @@ class MultiDigitSum:
 
         return samples
 
-
-class InContextRetrieval:
-    def __init__(
-        self, max_input_token=16, max_label_token=16, sep_token=0, device="cuda"
-    ):
-        self.max_input_token = max_input_token
-        self.max_label_token = max_label_token
-        self.sep_token = sep_token
-        self.device = device
-
-    @torch.no_grad()
-    def sample(self, num_samples, num_tokens):
-
-        inputs = torch.arange(start=1, end=num_tokens + 1).repeat(num_samples, 1)
-        labels = torch.arange(start=num_tokens + 1, end=2 * num_tokens + 1).repeat(
-            num_samples, 1
-        )
-
-        for idx in range(num_samples):
-            inputs[idx, :] = inputs[idx, torch.randperm(num_tokens)]
-            labels[idx, :] = labels[idx, torch.randperm(num_tokens)]
-
-        samples = torch.zeros((num_samples, 2 * num_tokens + 3), dtype=int).to(
-            self.device
-        )
-
-        samples[:, :-3:2] = inputs
-        samples[:, 1:-3:2] = labels
-
-        random_idx = torch.randint(low=0, high=num_tokens, size=(num_samples, 1))
-
-        samples[:, -3] = self.sep_token
-        samples[:, -2] = torch.gather(inputs, index=random_idx, dim=1).squeeze(-1)
-        samples[:, -1] = torch.gather(labels, index=random_idx, dim=1).squeeze(-1)
-
-        return samples
-    
 
 class Histogram:
     def __init__(self, alphabet_size=26, device="cuda"):

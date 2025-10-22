@@ -52,9 +52,9 @@ class CausalSelfAttention(nn.Module):
         assert config.n_embd % config.n_head == 0
 
         # key, query, value projections for all heads
-        self.k = nn.Linear(config.n_embd, config.n_embd)
-        self.q = nn.Linear(config.n_embd, config.n_embd)
-        self.v = nn.Linear(config.n_embd, config.n_embd)
+        self.Q = nn.Linear(config.n_embd, config.n_embd)
+        self.K = nn.Linear(config.n_embd, config.n_embd)
+        self.V = nn.Linear(config.n_embd, config.n_embd)
         
         # output projection
         self.c_proj = nn.Linear(config.n_embd, config.n_embd)
@@ -77,9 +77,9 @@ class CausalSelfAttention(nn.Module):
         )  # batch size, sequence length, embedding dimensionality (n_embd)
 
         # calculate query, key, values for all heads
-        q = self.q(x)
-        k = self.k(x)
-        v = self.v(x)
+        q = self.Q(x)
+        k = self.K(x)
+        v = self.V(x)
 
         k = k.view(B, T, self.n_head, C // self.n_head).transpose(
             1, 2

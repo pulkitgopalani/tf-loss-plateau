@@ -52,10 +52,10 @@ class CausalSelfAttention(nn.Module):
         assert config.n_embd % config.n_head == 0
 
         # key, query, value projections for all heads
-        self.Q = nn.Linear(config.n_embd, config.n_embd)
         self.K = nn.Linear(config.n_embd, config.n_embd)
+        self.Q = nn.Linear(config.n_embd, config.n_embd)
         self.V = nn.Linear(config.n_embd, config.n_embd)
-        
+
         # output projection
         self.c_proj = nn.Linear(config.n_embd, config.n_embd)
 
@@ -66,7 +66,7 @@ class CausalSelfAttention(nn.Module):
                 1, 1, config.block_size, config.block_size
             ),
         )
-        
+
         self.n_head = config.n_head
         self.n_embd = config.n_embd
         self.return_att = return_att
@@ -94,7 +94,7 @@ class CausalSelfAttention(nn.Module):
         # causal self-attention; Self-attend: (B, nh, T, hs) x (B, nh, hs, T) -> (B, nh, T, T)
         att = (q @ k.transpose(-2, -1)) * (1.0 / math.sqrt(k.size(-1)))
         att = att.masked_fill(self.bias[:, :, :T, :T] == 0, 0.0)
-        
+
         att_copy = att.clone().detach()
 
         y = att @ v  # (B, nh, T, T) x (B, nh, T, hs) -> (B, nh, T, hs)
@@ -124,10 +124,8 @@ class Block(nn.Module):
                 c_fc=nn.Linear(config.n_embd, 4 * config.n_embd),
                 c_proj=nn.Linear(4 * config.n_embd, config.n_embd),
                 act=NewGELU(),
-                # dropout=nn.Dropout(config.resid_pdrop),
             )
         )
-        
         m = self.mlp
         self.mlpf = lambda x: m.c_proj(m.act(m.c_fc(x)))  # MLP forward
         self.return_att = return_att
@@ -137,13 +135,10 @@ class Block(nn.Module):
             x_prev, att = self.attn(self.ln_1(x))
             x = x + x_prev
 
-            # Track output of and residual stream after Attention layer
-            post_att_h = x_prev.clone().detach()
-            post_att_res_h = x.clone().detach()
-
+            post_att_pre_res_h = x_prev.clone().detach()
             x = x + self.mlpf(self.ln_2(x))
-            
-            return x, att, post_att_h, post_att_res_h
+
+            return x, post_att_pre_res_h, att
 
         else:
             x = x + self.attn(self.ln_1(x))
@@ -199,7 +194,6 @@ class GPTLinear(nn.Module):
             torch.nn.init.zeros_(module.bias)
             torch.nn.init.ones_(module.weight)
 
-
     # Only used for weight decay experiments -------------------------------------------
     def configure_optimizers(self, train_config):
         """
@@ -212,21 +206,21 @@ class GPTLinear(nn.Module):
         # separate out all parameters to those that will and won't experience regularizing weight decay
         decay = set()
         no_decay = set()
-        whitelist_weight_modules = (torch.nn.Linear, )
+        whitelist_weight_modules = (torch.nn.Linear,)
         blacklist_weight_modules = (torch.nn.LayerNorm, torch.nn.Embedding)
         for mn, m in self.named_modules():
             for pn, p in m.named_parameters():
-                fpn = '%s.%s' % (mn, pn) if mn else pn # full param name
+                fpn = "%s.%s" % (mn, pn) if mn else pn  # full param name
                 # random note: because named_modules and named_parameters are recursive
                 # we will see the same tensors p many many times. but doing it this way
                 # allows us to know which parent module any tensor p belongs to...
-                if pn.endswith('bias'):
+                if pn.endswith("bias"):
                     # all biases will not be decayed
                     no_decay.add(fpn)
-                elif pn.endswith('weight') and isinstance(m, whitelist_weight_modules):
+                elif pn.endswith("weight") and isinstance(m, whitelist_weight_modules):
                     # weights of whitelist modules will be weight decayed
                     decay.add(fpn)
-                elif pn.endswith('weight') and isinstance(m, blacklist_weight_modules):
+                elif pn.endswith("weight") and isinstance(m, blacklist_weight_modules):
                     # weights of blacklist modules will NOT be weight decayed
                     no_decay.add(fpn)
 
@@ -234,19 +228,30 @@ class GPTLinear(nn.Module):
         param_dict = {pn: p for pn, p in self.named_parameters()}
         inter_params = decay & no_decay
         union_params = decay | no_decay
-        assert len(inter_params) == 0, "parameters %s made it into both decay/no_decay sets!" % (str(inter_params), )
-        assert len(param_dict.keys() - union_params) == 0, "parameters %s were not separated into either decay/no_decay set!" \
-                                                    % (str(param_dict.keys() - union_params), )
+        assert (
+            len(inter_params) == 0
+        ), "parameters %s made it into both decay/no_decay sets!" % (str(inter_params),)
+        assert (
+            len(param_dict.keys() - union_params) == 0
+        ), "parameters %s were not separated into either decay/no_decay set!" % (
+            str(param_dict.keys() - union_params),
+        )
 
         # create the pytorch optimizer object
         optim_groups = [
-            {"params": [param_dict[pn] for pn in sorted(list(decay))], "weight_decay": train_config.wd},
-            {"params": [param_dict[pn] for pn in sorted(list(no_decay))], "weight_decay": 0.0},
+            {
+                "params": [param_dict[pn] for pn in sorted(list(decay))],
+                "weight_decay": train_config.wd,
+            },
+            {
+                "params": [param_dict[pn] for pn in sorted(list(no_decay))],
+                "weight_decay": 0.0,
+            },
         ]
         optimizer = torch.optim.AdamW(optim_groups, lr=train_config.lr)
         return optimizer
-    # -------------------------------------------
 
+    # -------------------------------------------
 
     def forward(self, idx, targets=None):
         device = idx.device
@@ -260,29 +265,22 @@ class GPTLinear(nn.Module):
 
         # forward the GPT model itself
         tok_emb = self.transformer.wte(idx)  # token embeddings of shape (b, t, n_embd)
-        pos_emb = self.transformer.wpe(pos)  # position embeddings of shape (1, t, n_embd)
+        pos_emb = self.transformer.wpe(
+            pos
+        )  # position embeddings of shape (1, t, n_embd)
         x = tok_emb + pos_emb
-        
-        # Track residual state before Attention layer for representation collapse
-        pre_att_h = x.clone().detach()
 
         for block in self.transformer.h:
             if self.return_att:
-                x, att, post_att_h, post_att_res_h = block(x)
-                attn_map = att.clone().detach()
-
-                del att
+                x, post_att_pre_res_h, attn_map = block(x)
             else:
                 x = block(x)
-
-        # Track residual state after MLP, before LayerNorm for representation collapse
-        post_mlp_h = x.clone().detach()
-
-        # Final logits
         x = self.transformer.ln_f(x)
 
-        pre_lm_h = x.clone().detach()
+        # Track residual state before LM head for representation collapse
+        # pre_lm_h = x.clone().detach()
 
+        # Final logits
         logits = self.lm_head(x)
 
         # if we are given some desired targets also calculate the loss
@@ -295,10 +293,10 @@ class GPTLinear(nn.Module):
             )
 
         if self.return_att:
-            return attn_map, pre_att_h, post_att_h, post_att_res_h, post_mlp_h, pre_lm_h, logits, loss
-        
-        return pre_att_h, post_att_h, post_att_res_h, post_mlp_h, pre_lm_h, logits, loss
-    
+            return attn_map, post_att_pre_res_h, logits, loss
+
+        return post_att_pre_res_h, logits, loss
+
     @torch.no_grad()
     def generate(
         self, idx, max_new_tokens, temperature=1.0, do_sample=False, top_k=None
@@ -308,15 +306,14 @@ class GPTLinear(nn.Module):
         the sequence max_new_tokens times, feeding the predictions back into the model each time.
         Most likely you'll want to make sure to be in model.eval() mode of operation for this.
         """
-        
+
         for _ in range(max_new_tokens):
             # if the sequence context is growing too long we must crop it at block_size
             idx_cond = (
                 idx if idx.size(1) <= self.block_size else idx[:, -self.block_size :]
             )
             # forward the model to get the logits for the index in the sequence
-            _, _, _, _, _, _, logits, _ = self(idx_cond)
-            # attn_maps.append(self.attn_map)
+            _, _, logits, _ = self(idx_cond)
             # pluck the logits at the final step and scale by desired temperature
             logits = logits[:, -1, :] / temperature
             # optionally crop the logits to only the top k options
